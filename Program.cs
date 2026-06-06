@@ -63,7 +63,26 @@ builder.Services
 // Authorization
 builder.Services.AddAuthorization();
 
+// 1. Register the services
+builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+builder.Services.AddSingleton<EnrollmentWorker>();
+
+// 2. Enable host validation for service provider scopes and builds
+builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = true;
+});
+
+// Bind PaymentOptions to the "Payments" section of appsettings.json and validate on start
+builder.Services.AddOptions<PaymentOptions>()
+    .BindConfiguration("Payments")
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+
 var app = builder.Build();
+
 
 
 
