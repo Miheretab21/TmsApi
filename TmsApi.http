@@ -1,6 +1,33 @@
 @TmsApi_HostAddress = http://localhost:5083
 
-GET {{TmsApi_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Create a new enrollment (POST)
+POST {{TmsApi_HostAddress}}/api/enrollments
+Content-Type: application/json
+X-Training-User: Miheretab
 
-###
+{
+  "studentId": "S12345",
+  "courseCode": "CS101"
+}
+
+### 2. Get all enrollments (GET)
+GET {{TmsApi_HostAddress}}/api/enrollments
+X-Training-User: Miheretab
+
+### 3. Get specific enrollment by ID (GET)
+ #b
+@enrollmentId = 423ed3ba
+GET {{TmsApi_HostAddress}}/api/enrollments/{{enrollmentId}}
+X-Training-User: Miheretab
+
+### 4. Get assessment results (GET)
+GET {{TmsApi_HostAddress}}/api/assessments/results
+X-Training-User: Miheretab
+
+### 5. Delete an enrollment (DELETE)
+DELETE {{TmsApi_HostAddress}}/api/enrollments/{{enrollmentId}}
+X-Training-User: Miheretab
+
+### 6. Test ProblemDetails Error Endpoint (GET)
+GET {{TmsApi_HostAddress}}/api/error
+X-Training-User: Miheretab
