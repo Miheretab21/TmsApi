@@ -1,3 +1,5 @@
+using TmsApi.Entities;
+
 public interface IStudentService
 {
     Task<Student> AddAsync(Student student);
@@ -18,14 +20,15 @@ public class StudentService : IStudentService
 
     public Task<Student> AddAsync(Student student)
     {
-        if (_store.ContainsKey(student.Id))
+        var key = student.RegistrationNumber;
+        if (_store.ContainsKey(key))
         {
-            _logger.LogWarning("Student {StudentId} already exists", student.Id);
-            return Task.FromResult(_store[student.Id]);
+            _logger.LogWarning("Student {StudentId} already exists", key);
+            return Task.FromResult(_store[key]);
         }
 
-        _store[student.Id] = student;
-        _logger.LogInformation("Added student {StudentId}", student.Id);
+        _store[key] = student;
+        _logger.LogInformation("Added student {StudentId}", key);
         return Task.FromResult(student);
     }
 
