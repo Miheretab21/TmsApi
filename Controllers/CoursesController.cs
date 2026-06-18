@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using TmsApi.Entities;
 
 [ApiController]
 [Route("api/courses")]
@@ -20,9 +19,9 @@ public class CoursesController(ICourseService courseService) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] Course course)
+    public async Task<IActionResult> Create([FromBody] CreateCourseRequest request)
     {
-        var record = await courseService.AddAsync(course);
+        var record = await courseService.AddAsync(request);
         return CreatedAtAction(nameof(GetById), new { code = record.Code }, record);
     }
 
