@@ -67,4 +67,35 @@ public class ReportsController(TmsDbContext context) : ControllerBase
             .ToListAsync();
         return Ok(list);
     }
+
+    // Exercise 3 Todo 1: Paged list of students — stable sort by name, page size 20
+    [HttpGet("students")]
+    public async Task<IActionResult> GetStudentsPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        var students = await context.Students
+            .OrderBy(s => s.Name)                           
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(s => new { s.Id, s.Name, s.RegistrationNumber, s.GPA, s.IsActive })
+            .ToListAsync(ct);
+
+        return Ok(students);
+    }
+
+    // Exercise 3 Todo 2: Top 5 courses by enrollment count
+    [HttpGet("top-courses")]
+    public async Task<IActionResult> GetTopCoursesByEnrollment(CancellationToken ct)
+    {
+        var top5 = await context.Enrollments
+            .GroupBy(e => e.Course.Title)
+            .Select(g => new { Course = g.Key, EnrollmentCount = g.Count() })
+            .OrderByDescending(x => x.EnrollmentCount)
+            .Take(5)
+            .ToListAsync(ct);
+
+        return Ok(top5);
+    }
 }
