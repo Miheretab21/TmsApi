@@ -98,4 +98,56 @@ public class ReportsController(TmsDbContext context) : ControllerBase
 
         return Ok(top5);
     }
+
+    // -------------------------------------------------------------------------
+    // Exercise 7 — Part A: Intentional N+1 (for learning)
+    // -------------------------------------------------------------------------
+    // Produces 1 query to load all students, then 1 extra query PER student to
+    // count their enrollments — total: 1 + N SQL statements in the log.
+    // Watch the console: you will see a separate COUNT query for every student.
+    [HttpGet("enrollment-counts-n-plus-1")]
+    public async Task<IActionResult> GetEnrollmentCountsNPlusOne(CancellationToken ct)
+    {
+        // Query 1: fetch all students (1 SQL statement)
+        var students = await context.Students
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var result = new List<object>();
+
+        foreach (var s in students)
+        {
+            // Query 2..N+1: one COUNT per student — this is the N+1 problem
+            var count = await context.Enrollments
+                .AsNoTracking()
+                .CountAsync(e => e.StudentId == s.Id, ct);
+
+            result.Add(new { s.Name, EnrollmentCount = count });
+        }
+
+        return Ok(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Exercise 7 — Part B: Fix with a shaped single query
+    // -------------------------------------------------------------------------
+    // EF Core translates s.Enrollments.Count into a SQL subquery inside the
+    // SELECT, so the entire result comes back in ONE SQL statement instead of
+    // 1 + N.  Compare the console output with the endpoint above.
+    [HttpGet("enrollment-counts-shaped")]
+    public async Task<IActionResult> GetEnrollmentCountsShaped(CancellationToken ct)
+    {
+        // Single query: EF emits SELECT ..., (SELECT COUNT(*) FROM "Enrollments"
+        // WHERE "StudentId" = s."Id") AS "EnrollmentCount" FROM "Students" AS s
+        var report = await context.Students
+            .AsNoTracking()
+            .Select(s => new
+            {
+                s.Name,
+                EnrollmentCount = s.Enrollments.Count
+            })
+            .ToListAsync(ct);
+
+        return Ok(report);
+    }
 }
