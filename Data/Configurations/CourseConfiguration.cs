@@ -12,13 +12,17 @@ public class CourseConfiguration : IEntityTypeConfiguration<Course>
 
         builder.Property(c => c.Code)
                .IsRequired()
-               .HasMaxLength(20);
+               .HasMaxLength(10);
 
         builder.Property(c => c.Title)
                .IsRequired()
                .HasMaxLength(200);
 
-        builder.Property(c => c.Capacity)
-               .IsRequired();
+        builder.HasIndex(c => c.Code)
+               .IsUnique();
+
+        builder.HasMany(c => c.Enrollments)
+               .WithOne(e => e.Course)
+               .HasForeignKey(e => e.CourseId);
     }
 }

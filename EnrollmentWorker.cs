@@ -1,3 +1,5 @@
+using TmsApi.Services;
+
 public class EnrollmentWorker
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -11,6 +13,5 @@ public class EnrollmentWorker
     {
         using var scope = _scopeFactory.CreateScope();
         var enrollmentService = scope.ServiceProvider.GetRequiredService<IEnrollmentService>();
-        var enrollments = enrollmentService.GetAllAsync().GetAwaiter().GetResult();
     }
 }

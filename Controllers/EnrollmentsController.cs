@@ -1,94 +1,41 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TmsApi.Data;
+using TmsApi.Dtos;
+using TmsApi.Services;
+
+namespace TmsApi.Controllers;
 
 [ApiController]
-[Route("api/enrollments")]
-public class EnrollmentsController(IEnrollmentService enrollmentService, TmsDbContext db) : ControllerBase
+[Route("api/courses/{courseId:int}/enrollments")]
+public class EnrollmentsController(
+    ICourseService courseService,
+    IEnrollmentService enrollmentService) : ControllerBase
 {
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
+    [HttpGet("{id:int}", Name = nameof(GetEnrollment))]
+    public async Task<IActionResult> GetEnrollment(int courseId, int id, CancellationToken ct)
     {
-        var enrollments = await enrollmentService.GetAllAsync();
-        return Ok(enrollments);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id)
-    {
-        var record = await enrollmentService.GetByIdAsync(id);
-        return record is not null ? Ok(record) : NotFound();
+        var enrollment = await enrollmentService.GetByIdAsync(courseId, id, ct);
+        return enrollment is not null ? Ok(enrollment) : NotFound();
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateEnrollmentRequest request)
+    public async Task<IActionResult> EnrollStudent(int courseId, EnrollStudentRequest request, CancellationToken ct)
     {
-        var record = await enrollmentService.EnrollAsync(request.StudentId, request.CourseCode);
-        return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
-    }
+        // 404 before 409 — a client posting into a course that does not exist
+        // deserves the 404, not a 409 about a course that was never there.
+        var course = await courseService.GetByIdAsync(courseId, ct);
+        if (course is null)
+            return NotFound();
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
-    {
-        var deleted = await enrollmentService.DeleteAsync(id);
-        return deleted ? NoContent() : NotFound();
-    }
-
-    // -------------------------------------------------------------------------
-    // Exercise 9 — Bulk archive using ExecuteUpdateAsync (set-based, not row-by-row)
-    // -------------------------------------------------------------------------
-    /// <summary>
-    /// Archives all enrollments older than the specified cutoff date in a single
-    /// UPDATE statement. Does not load rows into memory; executes directly on the DB.
-    /// </summary>
-    [HttpPost("bulk-archive")]
-    public async Task<IActionResult> BulkArchive([FromQuery] DateTime cutoffDate, CancellationToken ct)
-    {
-        // Npgsql requires UTC for timestamp with time zone — convert if caller sent Unspecified
-        var cutoffUtc = cutoffDate.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(cutoffDate, DateTimeKind.Utc)
-            : cutoffDate.ToUniversalTime();
-
-        // ExecuteUpdateAsync — single SQL UPDATE statement, no tracking, no round-trips per row
-        var affected = await db.Enrollments
-            .Where(e => e.EnrolledAt < cutoffUtc)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(e => e.IsArchived, true),
-                ct);
-
-        return Ok(new
-        {
-            Message = $"Archived {affected} enrollment(s) older than {cutoffUtc:yyyy-MM-dd}.",
-            Affected = affected
-        });
-    }
-
-    // -------------------------------------------------------------------------
-    // Exercise 9 — Admin restore: view archived enrollments
-    // -------------------------------------------------------------------------
-    /// <summary>
-    /// Admin-only endpoint. Shows archived enrollments that are normally hidden
-    /// by the HasQueryFilter. Use IgnoreQueryFilters() to see them.
-    /// </summary>
-    [HttpGet("archived")]
-    public async Task<IActionResult> GetArchived(CancellationToken ct)
-    {
-        var archived = await db.Enrollments
-            .IgnoreQueryFilters()              // See everything, including archived
-            .Where(e => e.IsArchived)          // Filter to only archived
-            .Select(e => new
+        if (course.EnrollmentCount >= course.MaxCapacity)
+            return Conflict(new ProblemDetails
             {
-                e.Id,
-                e.StudentId,
-                e.CourseId,
-                e.EnrolledAt,
-                e.Grade,
-                e.IsArchived
-            })
-            .ToListAsync(ct);
+                Title = "Course is full",
+                Detail = $"Course '{course.Title}' has reached its maximum capacity of {course.MaxCapacity}.",
+                Status = StatusCodes.Status409Conflict
+            });
 
-        return Ok(archived);
+        var enrollment = await enrollmentService.CreateAsync(courseId, request, ct);
+        return CreatedAtAction(nameof(GetEnrollment),
+            new { courseId, id = enrollment.Id }, enrollment);
     }
 }
-
-public record CreateEnrollmentRequest(string StudentId, string CourseCode);
