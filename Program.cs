@@ -6,9 +6,14 @@ using Scalar.AspNetCore;
 using TmsApi.Services;
 using TmsApi;
 
+using TmsApi.Filters;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<AuditLogFilter>();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
@@ -117,6 +122,13 @@ using (var scope = app.Services.CreateScope())
         context.Enrollments.AddRange(enrollments);
         context.SaveChanges();
     }
+}
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
+    await DataSeeder.SeedAsync(context);
 }
 
 app.Run();
