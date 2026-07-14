@@ -6,4 +6,6 @@ public class Course
     public required string Title { get; set; }
     public int MaxCapacity { get; set; }
     public ICollection<Enrollment> Enrollments { get; set; } = [];
+    public ICollection<Assessment> Assessments { get; set; } = [];
+    public ICollection<Certificate> Certificates { get; set; } = [];
 }
