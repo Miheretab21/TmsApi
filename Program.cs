@@ -4,6 +4,7 @@ using TmsApi.Entities;
 using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
 using TmsApi.Services;
+using Asp.Versioning;
 using TmsApi;
 
 using TmsApi.Filters;
@@ -47,6 +48,32 @@ builder.Services.AddOptions<PaymentOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.ShouldInclude = description =>
+        description.GroupName == "v1";
+});
+
+builder.Services.AddOpenApi("v2", options =>
+{
+    options.ShouldInclude = description =>
+        description.GroupName == "v2";
+});
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("X-Api-Version"));
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
 var app = builder.Build();
 
 app.UseStatusCodePages();
@@ -68,8 +95,17 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("TMS API Reference")
+               .WithTheme(ScalarTheme.DeepSpace)
+               .WithDefaultHttpClient(ScalarTarget.CSharp,ScalarClient.HttpClient);
+        options.AddDocument("v1", "API Version 1.0")
+               .AddDocument("v2", "API Version 2.0");
+    });
 }
+
+app.UseMiddleware<TmsApi.Middleware.V1DeprecationMiddleware>();
 
 app.MapControllers();
 
