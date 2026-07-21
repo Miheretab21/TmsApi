@@ -37,4 +37,22 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
             .Select(e => new EnrollmentResponseDto(e.Id, e.CourseId, e.StudentId, e.EnrolledAt))
             .ToListAsync(ct)
             .ContinueWith(t => (IReadOnlyList<EnrollmentResponseDto>)t.Result, ct);
+
+    public Task<bool> ExistsAsync(int studentId, string courseCode, CancellationToken ct = default) =>
+        context.Enrollments
+            .AsNoTracking()
+            .AnyAsync(e => e.StudentId == studentId && e.Course.Code == courseCode, ct);
+
+    public async Task AddAsync(Enrollment enrollment, CancellationToken ct = default)
+    {
+        context.Enrollments.Add(enrollment);
+        await context.SaveChangesAsync(ct);
+    }
+
+    public Task<List<Enrollment>> GetByStudentIdAsync(int studentId, CancellationToken ct = default) =>
+        context.Enrollments
+            .AsNoTracking()
+            .Include(e => e.Course)
+            .Where(e => e.StudentId == studentId)
+            .ToListAsync(ct);
 }

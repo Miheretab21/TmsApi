@@ -67,4 +67,9 @@ public class CourseService(TmsDbContext context, ILogger<CourseService> logger) 
             PageSize   = request.PageSize
         };
     }
+
+    public Task<Course?> GetByCodeAsync(string code, CancellationToken ct = default) =>
+        context.Courses
+            .Include(c => c.Enrollments)
+            .FirstOrDefaultAsync(c => c.Code == code, ct);
 }
