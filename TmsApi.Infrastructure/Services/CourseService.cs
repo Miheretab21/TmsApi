@@ -7,7 +7,10 @@ using TmsApi.Infrastructure.Persistence;
 
 namespace TmsApi.Infrastructure.Services;
 
-public class CourseService(TmsDbContext context, ILogger<CourseService> logger) : ICourseService
+public class CourseService(
+    TmsDbContext context,
+    ICachedCourseService cachedCourseService,
+    ILogger<CourseService> logger) : ICourseService
 {
     public Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct) =>
         context.Courses
@@ -28,6 +31,7 @@ public class CourseService(TmsDbContext context, ILogger<CourseService> logger) 
         context.Courses.Add(course);
         await context.SaveChangesAsync(ct);
         logger.LogInformation("Created course {CourseId} ({Code})", course.Id, course.Code);
+        await cachedCourseService.InvalidateCourseCacheAsync(ct);
         return (await GetByIdAsync(course.Id, ct))!;
     }
 

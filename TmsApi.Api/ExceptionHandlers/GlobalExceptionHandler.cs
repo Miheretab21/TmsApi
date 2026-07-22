@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using TmsApi.Application.Common;
 
 namespace TmsApi.Api.ExceptionHandlers;
 
@@ -18,6 +19,11 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 (IDictionary<string, string[]>?)ve.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray())),
+            NotFoundException nfe => (
+                StatusCodes.Status404NotFound,
+                "Resource not found",
+                nfe.Message,
+                null),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "Server error",
