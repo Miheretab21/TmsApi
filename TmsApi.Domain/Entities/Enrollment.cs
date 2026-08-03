@@ -14,6 +14,18 @@ public class Enrollment
     /// </summary>
     public bool IsArchived { get; set; } = false;
 
+    /// <summary>
+    /// Approval status set by an instructor. Defaults to Pending on creation.
+    /// </summary>
+    public EnrollmentStatus Status { get; set; } = EnrollmentStatus.Pending;
+
     public Student Student { get; set; } = null!;
     public Course Course { get; set; } = null!;
+}
+
+public enum EnrollmentStatus
+{
+    Pending,
+    Approved,
+    Rejected
 }

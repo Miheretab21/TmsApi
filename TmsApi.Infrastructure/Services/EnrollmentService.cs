@@ -55,4 +55,31 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
             .Include(e => e.Course)
             .Where(e => e.StudentId == studentId)
             .ToListAsync(ct);
+
+    public Task<IReadOnlyList<EnrollmentListDto>> GetAllAsync(CancellationToken ct) =>
+        context.Enrollments
+            .AsNoTracking()
+            .Include(e => e.Student)
+            .Include(e => e.Course)
+            .Select(e => new EnrollmentListDto(
+                e.Id.ToString(),
+                e.StudentId,
+                e.Student.Name,
+                e.CourseId,
+                e.Course.Title,
+                e.Status.ToString(),
+                e.EnrolledAt.ToString("o")))
+            .ToListAsync(ct)
+            .ContinueWith(t => (IReadOnlyList<EnrollmentListDto>)t.Result, ct);
+
+    public async Task<bool> ApproveAsync(string id, CancellationToken ct)
+    {
+        if (!int.TryParse(id, out var intId)) return false;
+        var enrollment = await context.Enrollments.FindAsync([intId], ct);
+        if (enrollment is null) return false;
+        enrollment.Status = EnrollmentStatus.Approved;
+        await context.SaveChangesAsync(ct);
+        logger.LogInformation("Enrollment {Id} approved", intId);
+        return true;
+    }
 }
