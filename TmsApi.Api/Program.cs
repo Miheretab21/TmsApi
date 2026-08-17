@@ -201,11 +201,20 @@ builder.Services.AddApiVersioning(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAngular", policy =>
-        policy.WithOrigins("http://localhost:4200")
+    // Load allowed origins from appsettings.Development.json
+    var allowedOrigins = builder.Configuration
+        .GetSection("AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:4200"];
+
+    // Register the CORS policy in the Dependency Injection container
+    options.AddPolicy("TmsClient", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials());
+              .AllowCredentials() // Vital for HttpOnly auth cookies in Session 2
+              .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+    });
 });
 
 var app = builder.Build();
@@ -215,7 +224,9 @@ app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseCors("AllowAngular");
+// CRITICAL: Middleware order matters!
+// UseRouting -> UseCors -> UseAuthentication -> UseAuthorization
+app.UseCors("TmsClient");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
