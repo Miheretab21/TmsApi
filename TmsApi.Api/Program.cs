@@ -14,6 +14,8 @@ using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.Filters;
 using TmsApi.Api.Middleware;
 using TmsApi.Api.RateLimiting;
+using TmsApi.Api.Hubs;
+using TmsApi.Application.Hubs;
 using TmsApi.Application.Behaviors;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Interfaces;
@@ -155,6 +157,8 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
 
+builder.Services.AddSignalR();
+
 // Step 4 – cache layer
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
@@ -200,7 +204,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAngular", policy =>
         policy.WithOrigins("http://localhost:4200")
               .AllowAnyHeader()
-              .AllowAnyMethod());
+              .AllowAnyMethod()
+              .AllowCredentials());
 });
 
 var app = builder.Build();
@@ -231,6 +236,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<V1DeprecationMiddleware>();
 
 app.MapControllers();
+app.MapHub<TmsHub>("/hubs/tms");
 app.MapHealthChecks("/health/live").DisableRateLimiting();
 app.MapHealthChecks("/health/ready").DisableRateLimiting();
 

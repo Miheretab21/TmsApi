@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using TmsApi.Api.Hubs;
 using TmsApi.Application.DTOs;
+using TmsApi.Application.Hubs;
 using TmsApi.Application.Interfaces;
 
 namespace TmsApi.Api.Controllers;
@@ -14,7 +17,9 @@ namespace TmsApi.Api.Controllers;
 [Tags("Enrollments")]
 [Produces("application/json")]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-public class EnrollmentsAdminController(IEnrollmentService enrollmentService) : ControllerBase
+public class EnrollmentsAdminController(
+    IEnrollmentService enrollmentService,
+    IHubContext<TmsHub, ITmsHubClient> hubContext) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<EnrollmentListDto>), StatusCodes.Status200OK)]
@@ -31,7 +36,14 @@ public class EnrollmentsAdminController(IEnrollmentService enrollmentService) : 
     [EndpointSummary("Approve an enrollment")]
     public async Task<IActionResult> Approve(string id, CancellationToken ct)
     {
+        // Your existing approval logic ...
         var success = await enrollmentService.ApproveAsync(id, ct);
-        return success ? NoContent() : NotFound();
+        if (!success) return NotFound();
+
+        // After the database commit succeeds, broadcast to all connected Angular clients
+        await hubContext.Clients.All
+            .ReceiveEnrollmentStatusUpdated(id, "Approved");
+
+        return NoContent();
     }
 }
