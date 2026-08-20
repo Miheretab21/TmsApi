@@ -21,6 +21,8 @@ using TmsApi.Application.Behaviors;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Interfaces;
 using TmsApi.Domain.Entities;
+using Microsoft.AspNetCore.Identity;
+using TmsApi.Infrastructure.Identity;
 using TmsApi.Infrastructure.Persistence;
 using TmsApi.Infrastructure.Services;
 
@@ -150,6 +152,23 @@ builder.Services
     .AddAuthentication("Training")
     .AddScheme<AuthenticationSchemeOptions, TrainingAuthHandler>("Training", null);
 builder.Services.AddAuthorization();
+
+// ASP.NET Core Identity — enterprise password policy + brute-force lockout
+builder.Services.AddIdentityCore<TmsUser>(options =>
+{
+    // Enterprise Password Policy
+    options.Password.RequiredLength          = 12;
+    options.Password.RequireUppercase        = true;
+    options.Password.RequireDigit            = true;
+    options.Password.RequireNonAlphanumeric  = true;
+
+    // Brute-Force Lockout Protection
+    options.Lockout.MaxFailedAccessAttempts  = 5;
+    options.Lockout.DefaultLockoutTimeSpan   = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers       = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<TmsDbContext>();
 
 // Register Antiforgery with header name matching Angular's default convention
 builder.Services.AddAntiforgery(options =>
