@@ -1,6 +1,9 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using TmsApi.Api.Hubs;
+using TmsApi.Application.Hubs;
 using TmsApi.Infrastructure.Persistence;
 
 namespace TmsApi.Api.Controllers.V1;
@@ -48,5 +51,30 @@ public class CoursesController(TmsDbContext context) : ControllerBase
             hasNext     = page < totalPages,
             hasPrevious = page > 1
         });
+    }
+
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteCourse(int id, CancellationToken ct)
+    {
+        var course = await context.Courses
+            .Include(c => c.Enrollments)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (course is null) return NotFound();
+
+        if (course.Enrollments.Count > 0)
+            return Conflict(new ProblemDetails
+            {
+                Title  = "Course has active enrollments",
+                Detail = $"Course '{course.Title}' cannot be deleted because it has {course.Enrollments.Count} active enrollment(s).",
+                Status = StatusCodes.Status409Conflict
+            });
+
+        context.Courses.Remove(course);
+        await context.SaveChangesAsync(ct);
+        return NoContent();
     }
 }

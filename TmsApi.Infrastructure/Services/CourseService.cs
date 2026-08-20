@@ -76,4 +76,21 @@ public class CourseService(
         context.Courses
             .Include(c => c.Enrollments)
             .FirstOrDefaultAsync(c => c.Code == code, ct);
+
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct)
+    {
+        var course = await context.Courses
+            .Include(c => c.Enrollments)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (course is null) return false;
+
+        // Signal the caller to return 409 — active enrollments block deletion
+        if (course.Enrollments.Count > 0) return false;
+
+        context.Courses.Remove(course);
+        await context.SaveChangesAsync(ct);
+        await cachedCourseService.InvalidateCourseCacheAsync(ct);
+        return true;
+    }
 }

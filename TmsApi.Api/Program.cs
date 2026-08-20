@@ -274,7 +274,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<V1DeprecationMiddleware>();
 
 app.MapControllers();
-app.MapHub<TmsHub>("/hubs/tms");
+app.MapHub<TmsHub>("/hubs/tms").RequireCors("TmsClient");
 app.MapHealthChecks("/health/live").DisableRateLimiting();
 app.MapHealthChecks("/health/ready").DisableRateLimiting();
 
