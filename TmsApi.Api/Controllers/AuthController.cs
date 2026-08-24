@@ -1,6 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using TmsApi.Domain.Entities;
 using TmsApi.Infrastructure.Identity;
 using TmsApi.Infrastructure.Persistence;
@@ -73,7 +76,9 @@ public class AuthController : ControllerBase
 
     public record LoginRequest(string Email, string Password);
 
+    // M11-S3: Rate-limited to 5 attempts per minute to block brute-force attacks
     [HttpPost("login")]
+    [EnableRateLimiting("LoginPolicy")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
@@ -171,6 +176,29 @@ public class AuthController : ControllerBase
         {
             accessToken  = newAccessToken,
             refreshToken = newRefreshToken.Token
+        });
+    }
+
+    /// <summary>
+    /// Returns the authenticated user's profile.
+    /// Called by the Angular AuthService after a successful login to hydrate the currentUser signal.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var user   = await _userManager.FindByIdAsync(userId!);
+        if (user is null) return Unauthorized();
+
+        var roles = await _userManager.GetRolesAsync(user);
+
+        return Ok(new
+        {
+            displayName = $"{user.FirstName} {user.LastName}".Trim(),
+            role        = roles.FirstOrDefault() ?? string.Empty,
+            email       = user.Email,
+            userId      = user.Id
         });
     }
 }

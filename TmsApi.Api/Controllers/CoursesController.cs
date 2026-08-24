@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using TmsApi.Application.DTOs;
@@ -12,8 +13,11 @@ namespace TmsApi.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
 public class CoursesController(
     ICourseService courseService,
+    IAuthorizationService authService,
     LinkGenerator linkGenerator) : ControllerBase
 {
+    // ── GET (public) ─────────────────────────────────────────────────────────
+
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<CourseResponseDto>), StatusCodes.Status200OK)]
     [EndpointSummary("List courses with pagination")]
@@ -61,7 +65,10 @@ public class CoursesController(
         return Ok(detailDto);
     }
 
+    // ── POST (Instructor or Admin) ────────────────────────────────────────────
+
     [HttpPost]
+    [Authorize(Roles = "Instructor,Admin")]
     [ProducesResponseType(typeof(CourseResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -81,7 +88,35 @@ public class CoursesController(
         return CreatedAtAction(nameof(GetCourseById), new { id = result.Id }, result);
     }
 
+    // ── PUT (resource-based: must be course owner or Admin) ──────────────────
+
+    [HttpPut("{id:int}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [EndpointSummary("Update a course")]
+    [EndpointDescription("Only the course's assigned instructor or an Admin may update it.")]
+    public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseDto dto, CancellationToken ct)
+    {
+        // 1. Load the full entity so the handler can inspect InstructorId
+        var course = await courseService.GetEntityByIdAsync(id, ct);
+        if (course is null) return NotFound();
+
+        // 2. Resource-based authorization: CourseInstructorHandler decides
+        var authResult = await authService.AuthorizeAsync(User, course, "CanEditCourse");
+        if (!authResult.Succeeded) return Forbid();
+
+        // 3. Apply the update
+        await courseService.UpdateAsync(id, dto.Title, dto.MaxCapacity, ct);
+        return NoContent();
+    }
+
+    // ── DELETE (Instructor or Admin) ──────────────────────────────────────────
+
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Instructor,Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -104,3 +139,6 @@ public class CoursesController(
         return NoContent();
     }
 }
+
+/// <summary>Request body for updating a course's mutable fields.</summary>
+public record UpdateCourseDto(string Title, int MaxCapacity);

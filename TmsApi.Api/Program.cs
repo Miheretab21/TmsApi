@@ -23,11 +23,13 @@ using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Interfaces;
 using TmsApi.Domain.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using TmsApi.Infrastructure.Identity;
 using TmsApi.Infrastructure.Persistence;
 using TmsApi.Infrastructure.Services;
+using TmsApi.Api.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -126,6 +128,14 @@ builder.Services.AddRateLimiter(options =>
         opt.ReplenishmentPeriod = TimeSpan.FromSeconds(10);
         opt.QueueLimit = 2;
     });
+
+    // M11-S3: Fixed-window limiter — 5 login attempts per minute per IP
+    options.AddFixedWindowLimiter("LoginPolicy", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window      = TimeSpan.FromMinutes(1);
+        opt.QueueLimit  = 0;
+    });
 });
 
 // Step 1: Register HybridCache (and decide about Redis later)
@@ -172,7 +182,15 @@ builder.Services.AddAuthentication(options =>
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
     };
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Resource-based policy: Admin OR the course's own Instructor
+    options.AddPolicy("CanEditCourse", policy =>
+        policy.Requirements.Add(new CourseInstructorRequirement()));
+});
+
+// Register the resource-based handler
+builder.Services.AddScoped<IAuthorizationHandler, CourseInstructorHandler>();
 
 // ASP.NET Core Identity — enterprise password policy + brute-force lockout
 builder.Services.AddIdentityCore<TmsUser>(options =>
@@ -270,6 +288,28 @@ app.UseStatusCodePages();
 app.UseExceptionHandler();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
+
+// M11-S3: Security headers — applied to API responses only.
+// Scalar's UI loads CDN scripts, inline styles and data: URIs that a strict
+// default-src 'self' policy would block, causing a white screen.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+
+    // Skip documentation UI routes so Scalar and OpenAPI spec endpoints render correctly
+    var isDocRoute = path.StartsWith("/scalar", StringComparison.OrdinalIgnoreCase)
+                  || path.StartsWith("/openapi", StringComparison.OrdinalIgnoreCase);
+
+    if (!isDocRoute)
+    {
+        context.Response.Headers.Append("X-Frame-Options", "DENY");
+        context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'");
+    }
+
+    await next();
+});
+
 app.UseRouting();
 // CRITICAL: Middleware order matters!
 // UseRouting -> UseCors -> UseAuthentication -> UseAuthorization
