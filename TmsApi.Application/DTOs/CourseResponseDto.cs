@@ -5,4 +5,6 @@ public record CourseResponseDto(
     string Code,
     string Title,
     int MaxCapacity,
-    int EnrollmentCount);
+    int EnrollmentCount,
+    string? InstructorId = null);
+

@@ -185,6 +185,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpGet("me")]
     [Authorize]
+    [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Me()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -193,12 +194,35 @@ public class AuthController : ControllerBase
 
         var roles = await _userManager.GetRolesAsync(user);
 
-        return Ok(new
+        // Try to find the associated student by matching first+last name
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.Name == fullName);
+        
+        // If not found by full name, try by email (fallback)
+        if (student == null && !string.IsNullOrEmpty(user.Email))
         {
-            displayName = $"{user.FirstName} {user.LastName}".Trim(),
-            role        = roles.FirstOrDefault() ?? string.Empty,
-            email       = user.Email,
-            userId      = user.Id
+            // Try to find student whose name contains email prefix
+            var emailPrefix = user.Email.Split('@')[0];
+            student = await _context.Students
+                .FirstOrDefaultAsync(s => s.Name.ToLower().Contains(emailPrefix.ToLower()));
+        }
+        
+        return Ok(new UserProfileResponse
+        {
+            DisplayName = fullName,
+            Role = roles.FirstOrDefault() ?? string.Empty,
+            Email = user.Email,
+            UserId = user.Id,
+            StudentId = student?.Id
         });
     }
+}
+
+public class UserProfileResponse
+{
+    public required string DisplayName { get; set; }
+    public required string Role { get; set; }
+    public required string Email { get; set; }
+    public required string UserId { get; set; }
+    public int? StudentId { get; set; }
 }

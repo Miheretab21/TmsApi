@@ -1,7 +1,14 @@
 namespace TmsApi.Application.DTOs;
 
 public record EnrollmentResponseDto(
-    int Id,
-    int CourseId,
+    string Id,
     int StudentId,
-    DateTime EnrolledAt);
+    string StudentName,
+    int CourseId,
+    string CourseCode,
+    string CourseName,
+    string Status,
+    DateTime EnrolledAt,
+    decimal? Grade = null);
+
+

@@ -18,4 +18,7 @@ public interface ICourseService
 
     /// <summary>Updates Title and MaxCapacity of a course by ID. Returns false when the course is not found.</summary>
     Task<bool> UpdateAsync(int id, string title, int maxCapacity, CancellationToken ct);
+
+    /// <summary>Assigns (or clears) the instructor for a course. Admin only.</summary>
+    Task<bool> AssignInstructorAsync(int id, string? instructorId, CancellationToken ct);
 }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TmsApi.Application.DTOs;
 using TmsApi.Application.Interfaces;
@@ -37,6 +38,7 @@ public class AssessmentsController(
     }
 
     [HttpPost]
+    [Authorize(Roles = "Instructor,Admin")]
     [ProducesResponseType(typeof(AssessmentResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

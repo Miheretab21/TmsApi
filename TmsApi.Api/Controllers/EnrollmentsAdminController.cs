@@ -4,6 +4,7 @@ using TmsApi.Api.Hubs;
 using TmsApi.Application.DTOs;
 using TmsApi.Application.Hubs;
 using TmsApi.Application.Interfaces;
+using TmsApi.Domain.Entities;
 
 namespace TmsApi.Api.Controllers;
 
@@ -36,14 +37,56 @@ public class EnrollmentsAdminController(
     [EndpointSummary("Approve an enrollment")]
     public async Task<IActionResult> Approve(string id, CancellationToken ct)
     {
-        // Your existing approval logic ...
         var success = await enrollmentService.ApproveAsync(id, ct);
         if (!success) return NotFound();
 
-        // After the database commit succeeds, broadcast to all connected Angular clients
         await hubContext.Clients.All
             .ReceiveEnrollmentStatusUpdated(id, "Approved");
 
         return NoContent();
     }
+
+    [HttpPost("{id}/reject")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [EndpointSummary("Reject an enrollment")]
+    public async Task<IActionResult> Reject(string id, CancellationToken ct)
+    {
+        if (!int.TryParse(id, out var intId)) return NotFound();
+        var enrollment = await enrollmentService.GetEntityByIdAsync(intId, ct);
+        if (enrollment is null) return NotFound();
+
+        enrollment.Status = EnrollmentStatus.Rejected;
+        await enrollmentService.UpdateAsync(enrollment, ct);
+
+        await hubContext.Clients.All
+            .ReceiveEnrollmentStatusUpdated(id, "Rejected");
+
+        return NoContent();
+    }
+
+    [HttpPost("{id}/grade")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [EndpointSummary("Submit a grade for an enrollment")]
+    public async Task<IActionResult> SubmitGrade(string id, [FromBody] SubmitGradeRequest request, CancellationToken ct)
+    {
+        if (!int.TryParse(id, out var intId)) return NotFound();
+        var enrollment = await enrollmentService.GetEntityByIdAsync(intId, ct);
+        if (enrollment is null) return NotFound();
+
+        if (request.Score < 0)
+            return BadRequest(new ValidationProblemDetails
+            {
+                Detail = "Score cannot be negative."
+            });
+
+        enrollment.Grade = request.Score;
+        await enrollmentService.UpdateAsync(enrollment, ct);
+
+        return NoContent();
+    }
 }
+
+public record SubmitGradeRequest(decimal Score);

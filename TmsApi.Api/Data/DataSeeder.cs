@@ -37,7 +37,10 @@ public static class DataSeeder
 
     public static async Task SeedAsync(TmsDbContext context, CancellationToken ct = default)
     {
-        await context.Database.MigrateAsync(ct);
+        // MigrateAsync() is relational-only — skip when using the InMemory provider
+        // (e.g. during integration tests with WebApplicationFactory).
+        if (context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+            await context.Database.MigrateAsync(ct);
 
         if (await context.Courses.AnyAsync(ct))
             return;

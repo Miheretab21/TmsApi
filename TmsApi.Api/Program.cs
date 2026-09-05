@@ -221,6 +221,7 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ICertificateService, CertificateService>();
+builder.Services.AddScoped<IInstructorService, InstructorService>();
 
 builder.Services.AddSignalR();
 
@@ -315,6 +316,15 @@ app.UseRouting();
 // UseRouting -> UseCors -> UseAuthentication -> UseAuthorization
 app.UseCors("TmsClient");
 app.UseRateLimiter();
+
+// DEBUG: Log Authorization header
+app.Use(async (context, next) =>
+{
+    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+    Console.WriteLine($"[DEBUG] Path: {context.Request.Path}, Auth header: {(authHeader != null ? "PRESENT (" + authHeader.Substring(0, Math.Min(20, authHeader.Length)) + "...)" : "MISSING")}");
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -374,7 +384,12 @@ app.MapGet("/api/assessments/results", () => Results.Ok(new
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-    context.Database.Migrate();
+
+    // Migrate() is relational-only — skip it when using the InMemory provider
+    // (e.g. during integration tests with WebApplicationFactory).
+    // IsRelational() itself throws on InMemory, so check the provider name string.
+    if (context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+        context.Database.Migrate();
 
     if (!context.Students.Any())
     {
@@ -417,3 +432,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+// Expose Program to the test project so WebApplicationFactory<Program> can reference it.
+public partial class Program { }

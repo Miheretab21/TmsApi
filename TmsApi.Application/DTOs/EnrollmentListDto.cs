@@ -11,6 +11,8 @@ public record EnrollmentListDto(
     int StudentId,
     string StudentName,
     int CourseId,
+    string CourseCode,
     string CourseName,
     string Status,
-    string EnrolledAt);
+    string EnrolledAt,
+    decimal? Grade = null);

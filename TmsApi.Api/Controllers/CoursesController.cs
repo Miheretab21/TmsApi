@@ -113,6 +113,21 @@ public class CoursesController(
         return NoContent();
     }
 
+    // ── PATCH assign instructor (Admin only) ─────────────────────────────────
+
+    [HttpPatch("{id:int}/assign-instructor")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [EndpointSummary("Assign or unassign an instructor for a course")]
+    [EndpointDescription("Pass instructorId: null to unassign. Admin only.")]
+    public async Task<IActionResult> AssignInstructor(
+        int id, [FromBody] AssignInstructorDto dto, CancellationToken ct)
+    {
+        var updated = await courseService.AssignInstructorAsync(id, dto.InstructorId, ct);
+        return updated ? NoContent() : NotFound();
+    }
+
     // ── DELETE (Instructor or Admin) ──────────────────────────────────────────
 
     [HttpDelete("{id:int}")]
@@ -142,3 +157,6 @@ public class CoursesController(
 
 /// <summary>Request body for updating a course's mutable fields.</summary>
 public record UpdateCourseDto(string Title, int MaxCapacity);
+
+/// <summary>Request body for assigning an instructor to a course.</summary>
+public record AssignInstructorDto(string? InstructorId);

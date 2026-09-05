@@ -12,8 +12,19 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
     public Task<EnrollmentResponseDto?> GetByIdAsync(int courseId, int id, CancellationToken ct) =>
         context.Enrollments
             .AsNoTracking()
+            .Include(e => e.Student)
+            .Include(e => e.Course)
             .Where(e => e.Id == id && e.CourseId == courseId)
-            .Select(e => new EnrollmentResponseDto(e.Id, e.CourseId, e.StudentId, e.EnrolledAt))
+            .Select(e => new EnrollmentResponseDto(
+                e.Id.ToString(),
+                e.StudentId,
+                e.Student.Name,
+                e.CourseId,
+                e.Course.Code,
+                e.Course.Title,
+                e.Status.ToString(),
+                e.EnrolledAt,
+                e.Grade))
             .FirstOrDefaultAsync(ct);
 
     public async Task<EnrollmentResponseDto> CreateAsync(int courseId, EnrollStudentRequest request, CancellationToken ct)
@@ -22,7 +33,8 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
         {
             CourseId  = courseId,
             StudentId = request.StudentId,
-            EnrolledAt = DateTime.UtcNow
+            EnrolledAt = DateTime.UtcNow,
+            Status = EnrollmentStatus.Pending
         };
         context.Enrollments.Add(enrollment);
         await context.SaveChangesAsync(ct);
@@ -33,14 +45,26 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
     public Task<IReadOnlyList<EnrollmentResponseDto>> GetByCourseAsync(int courseId, CancellationToken ct) =>
         context.Enrollments
             .AsNoTracking()
+            .Include(e => e.Student)
+            .Include(e => e.Course)
             .Where(e => e.CourseId == courseId)
-            .Select(e => new EnrollmentResponseDto(e.Id, e.CourseId, e.StudentId, e.EnrolledAt))
+            .Select(e => new EnrollmentResponseDto(
+                e.Id.ToString(),
+                e.StudentId,
+                e.Student.Name,
+                e.CourseId,
+                e.Course.Code,
+                e.Course.Title,
+                e.Status.ToString(),
+                e.EnrolledAt,
+                e.Grade))
             .ToListAsync(ct)
             .ContinueWith(t => (IReadOnlyList<EnrollmentResponseDto>)t.Result, ct);
 
     public Task<bool> ExistsAsync(int studentId, string courseCode, CancellationToken ct = default) =>
         context.Enrollments
             .AsNoTracking()
+            .Include(e => e.Course)
             .AnyAsync(e => e.StudentId == studentId && e.Course.Code == courseCode, ct);
 
     public async Task AddAsync(Enrollment enrollment, CancellationToken ct = default)
@@ -66,9 +90,11 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
                 e.StudentId,
                 e.Student.Name,
                 e.CourseId,
+                e.Course.Code,
                 e.Course.Title,
                 e.Status.ToString(),
-                e.EnrolledAt.ToString("o")))
+                e.EnrolledAt.ToString("o"),
+                e.Grade))
             .ToListAsync(ct)
             .ContinueWith(t => (IReadOnlyList<EnrollmentListDto>)t.Result, ct);
 
@@ -81,5 +107,17 @@ public class EnrollmentService(TmsDbContext context, ILogger<EnrollmentService> 
         await context.SaveChangesAsync(ct);
         logger.LogInformation("Enrollment {Id} approved", intId);
         return true;
+    }
+
+    public Task<Enrollment?> GetEntityByIdAsync(int id, CancellationToken ct) =>
+        context.Enrollments
+            .Include(e => e.Student)
+            .Include(e => e.Course)
+            .FirstOrDefaultAsync(e => e.Id == id, ct);
+
+    public async Task UpdateAsync(Enrollment enrollment, CancellationToken ct)
+    {
+        context.Enrollments.Update(enrollment);
+        await context.SaveChangesAsync(ct);
     }
 }

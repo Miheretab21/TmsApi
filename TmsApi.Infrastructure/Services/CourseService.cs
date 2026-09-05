@@ -17,7 +17,7 @@ public class CourseService(
             .AsNoTracking()
             .Where(c => c.Id == id)
             .Select(c => new CourseResponseDto(
-                c.Id, c.Code, c.Title, c.MaxCapacity, c.Enrollments.Count))
+                c.Id, c.Code, c.Title, c.MaxCapacity, c.Enrollments.Count, c.InstructorId))
             .FirstOrDefaultAsync(ct);
 
     /// <summary>Returns the tracked Course entity (including InstructorId) for authorization checks.</summary>
@@ -64,7 +64,7 @@ public class CourseService(
         var items = await sortedQuery
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(c => new CourseResponseDto(c.Id, c.Code, c.Title, c.MaxCapacity, c.Enrollments.Count))
+            .Select(c => new CourseResponseDto(c.Id, c.Code, c.Title, c.MaxCapacity, c.Enrollments.Count, c.InstructorId))
             .ToListAsync(ct);
 
         return new PagedResponse<CourseResponseDto>
@@ -111,6 +111,19 @@ public class CourseService(
 
         logger.LogInformation("Updated course {CourseId}: Title={Title}, MaxCapacity={MaxCapacity}",
             id, title, maxCapacity);
+        return true;
+    }
+
+    public async Task<bool> AssignInstructorAsync(int id, string? instructorId, CancellationToken ct)
+    {
+        var course = await context.Courses.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (course is null) return false;
+
+        course.InstructorId = instructorId;
+        await context.SaveChangesAsync(ct);
+        await cachedCourseService.InvalidateCourseCacheAsync(ct);
+
+        logger.LogInformation("Assigned instructor {InstructorId} to course {CourseId}", instructorId, id);
         return true;
     }
 }
